@@ -10,6 +10,8 @@ Key architectural decisions:
 - **External cache**: Upstash Redis (no local Redis)
 - **Temporal workflows**: Runs with its own dedicated PostgreSQL instance for scheduling and automation
 - **Per-user configuration**: Each user has their own connected accounts, voice profile, and publishing preferences
+- **Schema management**: Uses `prisma db push` (not `prisma migrate`) for schema changes
+- **Dockerfile.dev naming**: The `Dockerfile.dev` name is inherited from upstream Postiz. Despite the name, this is the production build file (pnpm install, pnpm build, nginx + pm2). It is not a development-only Dockerfile.
 
 ## Prerequisites
 
@@ -258,6 +260,50 @@ After deployment, verify everything is working:
 6. **Social media connections**:
    - Connect a test LinkedIn/X account
    - Create and publish a test post
+
+## Database Schema Management
+
+This project uses `prisma db push` rather than `prisma migrate` to synchronize the database schema. After deploying a new version that includes schema changes (e.g., the VoiceProfile model):
+
+```bash
+# Run from the postiz-app root in the deployment environment
+npx prisma db push
+```
+
+Or via the npm script:
+```bash
+pnpm run prisma-db-push
+```
+
+**Important**: Run `prisma db push` after every deploy that changes `schema.prisma`. This is idempotent and safe to run repeatedly. It will apply any pending schema changes without dropping data (unless a destructive change is required, in which case it will prompt).
+
+For Railway deployments, add this as a deploy command or run it manually via the Railway CLI after deploy.
+
+## Iframe Embedding and X-Frame-Options
+
+The TA Portal embeds the Social Hub at `social.talent-aligned.com.au` in an iframe on the `/dashboard/social` page. For this to work, the Postiz deployment must allow framing from the portal origin.
+
+### Required Configuration on the Postiz (Social Hub) side
+
+Configure the web server (nginx in the Dockerfile.dev build) or the Next.js app to send these headers:
+
+```
+X-Frame-Options: ALLOW-FROM https://portal.talent-aligned.com.au
+Content-Security-Policy: frame-ancestors 'self' https://portal.talent-aligned.com.au https://admin.talent-aligned.com.au
+```
+
+Since both services are on `*.talent-aligned.com.au` subdomains, this is a same-site (but cross-origin) configuration. Modern browsers rely on the `frame-ancestors` CSP directive rather than `X-Frame-Options`, so the CSP header is the primary mechanism.
+
+### Cloudflare Configuration
+
+If using Cloudflare in front of both services, you can set these headers via a Cloudflare Transform Rule on the `social.talent-aligned.com.au` zone.
+
+### Known Limitation
+
+Third-party cookie restrictions in Safari and Chrome incognito may affect the SSO session within the iframe. If users experience repeated login prompts inside the iframe, consider:
+1. Opening the Social Hub in a new tab instead of an iframe
+2. Using a popup-based SSO flow
+3. Token passing via `postMessage` between parent and iframe
 
 ## Troubleshooting
 

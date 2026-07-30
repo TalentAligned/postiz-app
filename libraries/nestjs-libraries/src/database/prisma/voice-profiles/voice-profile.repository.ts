@@ -1,9 +1,12 @@
-import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
+import { PrismaRepository, PrismaTransaction } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class VoiceProfileRepository {
-  constructor(private _voiceProfiles: PrismaRepository<'voiceProfile'>) {}
+  constructor(
+    private _voiceProfiles: PrismaRepository<'voiceProfile'>,
+    private _transaction: PrismaTransaction
+  ) {}
 
   findByUserAndOrg(userId: string, orgId: string) {
     return this._voiceProfiles.model.voiceProfile.findMany({
@@ -55,14 +58,15 @@ export class VoiceProfileRepository {
   }
 
   async setDefault(id: string, userId: string, orgId: string) {
-    await this._voiceProfiles.model.voiceProfile.updateMany({
-      where: { userId, organizationId: orgId },
-      data: { isDefault: false },
-    });
-
-    return this._voiceProfiles.model.voiceProfile.update({
-      where: { id },
-      data: { isDefault: true },
-    });
+    return this._transaction.model.$transaction([
+      this._voiceProfiles.model.voiceProfile.updateMany({
+        where: { userId, organizationId: orgId },
+        data: { isDefault: false },
+      }),
+      this._voiceProfiles.model.voiceProfile.update({
+        where: { id },
+        data: { isDefault: true },
+      }),
+    ]);
   }
 }
