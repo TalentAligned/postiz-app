@@ -40,7 +40,7 @@ export class TemporalRegister implements OnModuleInit {
         });
       }
     } catch (err) {
-      console.warn('[TemporalRegister] Failed to register search attributes (Temporal may not be running):', err?.message || err);
+      console.warn('[TemporalRegister] Failed to register search attributes (Temporal may not be running):', err instanceof Error ? err.message : err);
     }
   }
 }
