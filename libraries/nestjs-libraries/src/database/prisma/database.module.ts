@@ -44,6 +44,8 @@ import { ErrorsRepository } from '@gitroom/nestjs-libraries/database/prisma/erro
 import { ErrorsService } from '@gitroom/nestjs-libraries/database/prisma/errors/errors.service';
 import { AdminStatsRepository } from '@gitroom/nestjs-libraries/database/prisma/admin-stats/admin-stats.repository';
 import { AdminStatsService } from '@gitroom/nestjs-libraries/database/prisma/admin-stats/admin-stats.service';
+import { VoiceProfileRepository } from '@gitroom/nestjs-libraries/database/prisma/voice-profiles/voice-profile.repository';
+import { VoiceProfileService } from '@gitroom/nestjs-libraries/database/prisma/voice-profiles/voice-profile.service';
 
 @Global()
 @Module({
@@ -97,6 +99,8 @@ import { AdminStatsService } from '@gitroom/nestjs-libraries/database/prisma/adm
     ErrorsService,
     AdminStatsRepository,
     AdminStatsService,
+    VoiceProfileRepository,
+    VoiceProfileService,
   ],
   get exports() {
     return this.providers;
