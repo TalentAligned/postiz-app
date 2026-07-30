@@ -43,6 +43,7 @@ model Organization {
   webhooks            Webhooks[]
   oauthApp            OAuthApp[]
   oauthAuthorizations OAuthAuthorization[]
+  voiceProfiles       VoiceProfile[]
 
   @@index([apiKey])
   @@index([streakSince])
@@ -113,6 +114,7 @@ model User {
   sendFailureEmails     Boolean              @default(true)
   sendStreakEmails      Boolean              @default(true)
   oauthAuthorizations   OAuthAuthorization[]
+  voiceProfiles         VoiceProfile[]
 
   @@unique([email, providerName])
   @@index([lastReadNotifications])
@@ -967,4 +969,23 @@ model Announcement {
   description String
   color       AnnouncementColor @default(INFO)
   createdAt   DateTime          @default(now())
+}
+
+model VoiceProfile {
+  id              String       @id @default(uuid())
+  userId          String
+  organizationId  String
+  toneName        String
+  toneDescription String?
+  sampleContent   String?
+  platforms       String[]
+  isDefault       Boolean      @default(false)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  user            User         @relation(fields: [userId], references: [id])
+  organization    Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([userId, organizationId, toneName])
+  @@index([userId])
+  @@index([organizationId])
 }

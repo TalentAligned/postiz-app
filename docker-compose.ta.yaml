@@ -1,0 +1,149 @@
+# Talent Aligned Social Hub - Production Docker Compose
+# Uses external Supabase Postgres and Upstash Redis
+# Only runs the Postiz app container and Temporal stack locally
+
+services:
+  postiz:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: postiz-ta
+    restart: always
+    environment:
+      # === Core URLs
+      MAIN_URL: 'https://social.talent-aligned.com.au'
+      FRONTEND_URL: 'https://social.talent-aligned.com.au'
+      NEXT_PUBLIC_BACKEND_URL: 'https://social.talent-aligned.com.au/api'
+      BACKEND_INTERNAL_URL: 'http://localhost:3000'
+      IS_GENERAL: 'true'
+
+      # === Authentication - SSO Only (no email/password registration)
+      DISABLE_REGISTRATION: 'true'
+      POSTIZ_GENERIC_OAUTH: 'true'
+      NEXT_PUBLIC_POSTIZ_OAUTH_DISPLAY_NAME: 'Talent Aligned'
+      POSTIZ_OAUTH_AUTH_URL: 'https://portal.talent-aligned.com.au/api/oidc/authorize'
+      POSTIZ_OAUTH_TOKEN_URL: 'https://portal.talent-aligned.com.au/api/oidc/token'
+      POSTIZ_OAUTH_USERINFO_URL: 'https://portal.talent-aligned.com.au/api/oidc/userinfo'
+      POSTIZ_OAUTH_SCOPE: 'openid profile email'
+      POSTIZ_OAUTH_CLIENT_ID: '${POSTIZ_OAUTH_CLIENT_ID}'
+      POSTIZ_OAUTH_CLIENT_SECRET: '${POSTIZ_OAUTH_CLIENT_SECRET}'
+
+      # === Security
+      JWT_SECRET: '${JWT_SECRET}'
+
+      # === External Database (Supabase Postgres)
+      DATABASE_URL: '${DATABASE_URL}'
+
+      # === External Cache (Upstash Redis)
+      REDIS_URL: '${REDIS_URL}'
+
+      # === Temporal Workflow Engine
+      TEMPORAL_ADDRESS: 'temporal:7233'
+
+      # === Storage
+      STORAGE_PROVIDER: 'local'
+      UPLOAD_DIRECTORY: '/uploads'
+      NEXT_PUBLIC_UPLOAD_DIRECTORY: '/uploads'
+
+      # === AI
+      OPENAI_API_KEY: '${OPENAI_API_KEY}'
+
+      # === Social Media API Keys (set via .env file)
+      X_URL: '${X_URL:-}'
+      X_API_KEY: '${X_API_KEY:-}'
+      X_API_SECRET: '${X_API_SECRET:-}'
+      LINKEDIN_CLIENT_ID: '${LINKEDIN_CLIENT_ID:-}'
+      LINKEDIN_CLIENT_SECRET: '${LINKEDIN_CLIENT_SECRET:-}'
+      REDDIT_CLIENT_ID: '${REDDIT_CLIENT_ID:-}'
+      REDDIT_CLIENT_SECRET: '${REDDIT_CLIENT_SECRET:-}'
+      FACEBOOK_APP_ID: '${FACEBOOK_APP_ID:-}'
+      FACEBOOK_APP_SECRET: '${FACEBOOK_APP_SECRET:-}'
+      YOUTUBE_CLIENT_ID: '${YOUTUBE_CLIENT_ID:-}'
+      YOUTUBE_CLIENT_SECRET: '${YOUTUBE_CLIENT_SECRET:-}'
+      TIKTOK_CLIENT_ID: '${TIKTOK_CLIENT_ID:-}'
+      TIKTOK_CLIENT_SECRET: '${TIKTOK_CLIENT_SECRET:-}'
+      PINTEREST_CLIENT_ID: '${PINTEREST_CLIENT_ID:-}'
+      PINTEREST_CLIENT_SECRET: '${PINTEREST_CLIENT_SECRET:-}'
+      THREADS_APP_ID: '${THREADS_APP_ID:-}'
+      THREADS_APP_SECRET: '${THREADS_APP_SECRET:-}'
+      INSTAGRAM_APP_ID: '${INSTAGRAM_APP_ID:-}'
+      INSTAGRAM_APP_SECRET: '${INSTAGRAM_APP_SECRET:-}'
+
+      # === Developer Settings
+      NX_ADD_PLUGINS: 'false'
+
+    volumes:
+      - postiz-uploads:/uploads/
+    ports:
+      - '5000:5000'
+    networks:
+      - postiz-network
+      - temporal-network
+    depends_on:
+      temporal:
+        condition: service_started
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:5000/api']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # -----------------------
+  # Temporal Stack
+  # Temporal requires its own PostgreSQL (separate from the app DB)
+  # -----------------------
+  temporal-postgresql:
+    image: postgres:16
+    container_name: temporal-postgresql-ta
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_USER: temporal
+      POSTGRES_DB: temporal
+    networks:
+      - temporal-network
+    expose:
+      - 5432
+    volumes:
+      - temporal-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U temporal']
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  temporal:
+    image: temporalio/auto-setup:1.28.1
+    container_name: temporal-ta
+    restart: always
+    depends_on:
+      temporal-postgresql:
+        condition: service_healthy
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=temporal-postgresql
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+      - TEMPORAL_NAMESPACE=default
+    networks:
+      - temporal-network
+    expose:
+      - 7233
+    volumes:
+      - ./dynamicconfig:/etc/temporal/config/dynamicconfig
+
+volumes:
+  postiz-uploads:
+    external: false
+  temporal-pg-data:
+    external: false
+
+networks:
+  postiz-network:
+    external: false
+  temporal-network:
+    driver: bridge
+    name: temporal-network-ta
