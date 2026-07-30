@@ -10,28 +10,37 @@ export class TemporalRegister implements OnModuleInit {
     if (process.env.TEMPORAL_TLS === 'true') {
       return;
     }
-    const connection = this._client?.client?.getRawClient()
-      ?.connection as Connection;
+    try {
+      const connection = this._client?.client?.getRawClient()
+        ?.connection as Connection;
 
-    const { customAttributes } =
-      await connection.operatorService.listSearchAttributes({
-        namespace: process.env.TEMPORAL_NAMESPACE || 'default',
-      });
+      if (!connection) {
+        console.warn('[TemporalRegister] No Temporal connection available, skipping search attribute registration');
+        return;
+      }
 
-    const neededAttribute = ['organizationId', 'postId'];
-    const missingAttributes = neededAttribute.filter(
-      (attr) => !customAttributes[attr]
-    );
+      const { customAttributes } =
+        await connection.operatorService.listSearchAttributes({
+          namespace: process.env.TEMPORAL_NAMESPACE || 'default',
+        });
 
-    if (missingAttributes.length > 0) {
-      await connection.operatorService.addSearchAttributes({
-        namespace: process.env.TEMPORAL_NAMESPACE || 'default',
-        searchAttributes: missingAttributes.reduce((all, current) => {
-          // @ts-ignore
-          all[current] = 1;
-          return all;
-        }, {}),
-      });
+      const neededAttribute = ['organizationId', 'postId'];
+      const missingAttributes = neededAttribute.filter(
+        (attr) => !customAttributes[attr]
+      );
+
+      if (missingAttributes.length > 0) {
+        await connection.operatorService.addSearchAttributes({
+          namespace: process.env.TEMPORAL_NAMESPACE || 'default',
+          searchAttributes: missingAttributes.reduce((all, current) => {
+            // @ts-ignore
+            all[current] = 1;
+            return all;
+          }, {}),
+        });
+      }
+    } catch (err) {
+      console.warn('[TemporalRegister] Failed to register search attributes (Temporal may not be running):', err?.message || err);
     }
   }
 }
