@@ -27,3 +27,4 @@ RUN NODE_OPTIONS="--max-old-space-size=4096" pnpm run build
 
 CMD ["sh", "-c", "nginx && pnpm run pm2"]
 # cache-bust 1785405693
+
